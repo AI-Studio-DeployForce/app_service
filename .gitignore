@@ -1,0 +1,38 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+*.pot
+*.pyc
+*.swp
+*.swo
+
+# Virtual environments
+venv/
+.env
+*.env
+Pipfile
+Pipfile.lock
+
+# Django-specific ignores
+db.sqlite3
+media/
+staticfiles/
+*.log
+*.bak
+*.pid
+.DS_Store
+*.log
+
+# Ignore migrations except __init__.py
+*/migrations/*
+!*/migrations/__init__.py
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.iml
+
+# Ignore Docker files
+docker-compose.override.yml
