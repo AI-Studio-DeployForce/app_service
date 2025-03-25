@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Django App{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+  </head>
+  <body>
+    <header>
+      <nav>
+        <!-- Navigation elements will go here -->
+      </nav>
+    </header>
+
+    <main>
+      {% block content %}
+      <!-- Content will be inserted here by child templates -->
+      {% endblock %}
+    </main>
+
+    <footer>
+      <p>&copy; {% now "Y" %} Django App</p>
+    </footer>
+
+    {% block scripts %}
+    <!-- Scripts will be inserted here -->
+    {% endblock %}
+  </body>
+</html>
