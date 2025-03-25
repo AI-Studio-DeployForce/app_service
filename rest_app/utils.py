@@ -5,8 +5,9 @@ def transform_pixel_to_geo(image_size, geo_transform):
     Converts pixel coordinates to geographical coordinates (latitude, longitude).
 
     Parameters:
-    - image_size (tuple): (width, height) of the image
-    - geo_transform (dict): Geotransform metadata for an image
+    - image_size (tuple): (width, height) of the image.
+    - geo_transform (dict): Geotransform metadata for an image.
+
     
     Returns:
     - geo_matrix (numpy.ndarray): 2D matrix containing (latitude, longitude) for each pixel.
