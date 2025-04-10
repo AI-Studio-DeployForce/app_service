@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - Damage Assessment{% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <h1 class="mb-4">Welcome to <span style="color:#4a47a3;">DeployForce</span></h1>
+    <p class="lead mb-4">A smart AI tool to assess building damage severity from satellite images.</p>
+    <a href="{% url 'upload' %}" class="btn btn-primary btn-lg">Get Started</a>
+</div>
+{% endblock %}
