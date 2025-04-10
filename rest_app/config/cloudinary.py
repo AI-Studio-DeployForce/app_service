@@ -1,77 +1,90 @@
-"""
-Cloudinary configuration module
-"""
-import os
-from django.conf import settings
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+from django.conf import settings
+import os
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
+
+# Initialize Cloudinary
 def initialize_cloudinary():
     """
-    Initialize Cloudinary with credentials from settings or environment variables
+    Initialize Cloudinary with credentials from environment variables.
+    This function should be called once when the app starts.
     """
-    # Try to get credentials from settings.py first
-    cloud_name = getattr(settings, 'CLOUDINARY_CLOUD_NAME', None)
-    api_key = getattr(settings, 'CLOUDINARY_API_KEY', None)
-    api_secret = getattr(settings, 'CLOUDINARY_API_SECRET', None)
-    
-    # If not in settings, try environment variables
-    if not all([cloud_name, api_key, api_secret]):
-        cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
-        api_key = os.environ.get('CLOUDINARY_API_KEY')
-        api_secret = os.environ.get('CLOUDINARY_API_SECRET')
-    
-    # Configure Cloudinary
     cloudinary.config(
-        cloud_name=cloud_name,
-        api_key=api_key,
-        api_secret=api_secret,
+        cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+        api_key=os.getenv('CLOUDINARY_API_KEY'),
+        api_secret=os.getenv('CLOUDINARY_API_SECRET'),
         secure=True
     )
-    
-    # Verify configuration
-    try:
-        # Test the configuration with a simple API call
-        cloudinary.api.ping()
-        print("Cloudinary configuration successful")
-        return True
-    except Exception as e:
-        print(f"Cloudinary configuration failed: {str(e)}")
-        return False
+    return cloudinary
 
-def upload_file(file, folder="uploads", **options):
+# Initialize the client
+cloudinary_client = initialize_cloudinary()
+CLOUDINARY_FOLDER_NAME = os.getenv('CLOUDINARY_FOLDER_NAME', 'default_folder')
+
+# File management functions
+def upload_file(file, folder=None, public_id=None):
     """
     Upload a file to Cloudinary
     
     Args:
-        file: File object to upload
-        folder: Destination folder in Cloudinary
-        options: Additional upload options
+        file: The file to upload
+        folder: Optional folder name to organize files
+        public_id: Optional custom public ID for the file
         
     Returns:
-        Dictionary with upload results
+        Dictionary with upload result information
     """
-    default_options = {
-        'folder': folder,
-        'resource_type': "auto",
-        'overwrite': True
+    upload_options = {
+        'resource_type': 'auto',  # Automatically detect resource type
     }
     
-    # Merge default options with provided options
-    upload_options = {**default_options, **options}
+    upload_options['folder'] = CLOUDINARY_FOLDER_NAME
+    if folder:
+        upload_options['folder'] += ("/" + folder)
     
-    # Upload the file
+    if public_id:
+        upload_options['public_id'] = public_id
+    
     try:
         result = cloudinary.uploader.upload(file, **upload_options)
         return {
             'success': True,
-            'url': result['secure_url'],
+            'secure_url': result['secure_url'],
             'public_id': result['public_id'],
-            'resource_type': result['resource_type']
+            'resource_type': result['resource_type'],
+            'format': result.get('format', ''),
+            'created_at': result['created_at']
         }
     except Exception as e:
         return {
             'success': False,
             'error': str(e)
-        } 
+        }
+
+def delete_file(public_id, resource_type='image'):
+    """
+    Delete a file from Cloudinary
+    
+    Args:
+        public_id: The public ID of the file to delete
+        resource_type: The resource type (image, video, raw)
+        
+    Returns:
+        Dictionary with deletion result
+    """
+    try:
+        result = cloudinary.uploader.destroy(public_id, resource_type=resource_type)
+        return {
+            'success': True,
+            'result': result
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
