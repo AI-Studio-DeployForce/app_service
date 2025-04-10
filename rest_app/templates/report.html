@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        h1 { color: #2C3E50; }
+        .section { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Damage Assessment Report</h1>
+    <p><strong>Generated for:</strong> {{ user_name }}</p>
+    <div class="section">
+        <h3>Summary</h3>
+        <p>{{ summary }}</p>
+    </div>
+    <div class="section">
+        <h3>Details</h3>
+        <ul>
+        {% for building in buildings %}
+            <li>{{ building.name }} — Severity: {{ building.severity }} ({{ building.lat }}, {{ building.lon }})</li>
+        {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
