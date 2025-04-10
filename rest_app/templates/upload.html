@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Images{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Upload Images for AI Damage Assessment</h1>
+    <form action="{% url 'inference' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="image_files" class="form-label">Satellite Images</label>
+            <input class="form-control" type="file" name="image_files" id="image_files" multiple required>
+        </div>
+        <div class="mb-3">
+            <label for="json_file" class="form-label">GeoTransform JSON</label>
+            <input class="form-control" type="file" name="json_file" id="json_file" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Submit for Analysis</button>
+    </form>
+
+    {% if report_url %}
+    <div class="mt-4 text-center">
+        <a href="{{ report_url }}" class="btn btn-success" download>Download Report</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

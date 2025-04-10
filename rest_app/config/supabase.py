@@ -1,100 +1,73 @@
-"""
-Supabase configuration module
-"""
+from supabase import create_client
 import os
-from django.conf import settings
-from supabase import create_client, Client
+from dotenv import load_dotenv
 
-# Global Supabase client
-supabase_client = None
+# Load environment variables
+load_dotenv()
 
-def initialize_supabase():
-    """
-    Initialize Supabase client with credentials from settings or environment variables
-    """
-    global supabase_client
-    
-    # Try to get credentials from settings.py first
-    supabase_url = getattr(settings, 'SUPABASE_URL', None)
-    supabase_key = getattr(settings, 'SUPABASE_KEY', None)
-    
-    # If not in settings, try environment variables
-    if not all([supabase_url, supabase_key]):
-        supabase_url = os.environ.get('SUPABASE_URL')
-        supabase_key = os.environ.get('SUPABASE_KEY')
-    
-    # Validate credentials
-    if not all([supabase_url, supabase_key]):
-        print("Supabase credentials not found in settings or environment variables")
-        return False
-    
-    try:
-        # Initialize the Supabase client
-        supabase_client = create_client(supabase_url, supabase_key)
-        
-        # Test the connection with a simple query
-        # This will raise an exception if the connection fails
-        supabase_client.table('test').select('*').limit(1).execute()
-        
-        print("Supabase configuration successful")
-        return True
-    except Exception as e:
-        print(f"Supabase configuration failed: {str(e)}")
-        return False
+# Initialize Supabase client
+supabase_url = os.getenv('SUPABASE_HOST_URL')
+supabase_key = os.getenv('SUPABASE_API_SECRET')
+supabase_client = create_client(supabase_url, supabase_key) 
 
-def get_supabase_client() -> Client:
-    """
-    Get the Supabase client instance
-    
-    Returns:
-        Supabase client instance or None if not initialized
-    """
-    global supabase_client
-    
-    if supabase_client is None:
-        # Try to initialize if not already done
-        initialize_supabase()
-    
+def get_new_supabase_client():
     return supabase_client
 
-def query_example(table_name, query_params=None):
+# INSERT
+def insert_row(table_name: str, data: dict):
+    """Insert a single row into a Supabase table."""
+    response = supabase_client.table(table_name).insert(data).execute()
+    return response.data if response.data else response.error
+
+def insert_multiple_rows(table_name: str, data_list: list[dict]) -> list[dict] | None:
     """
-    Example function to query Supabase
-    
-    Args:
-        table_name: Name of the table to query
-        query_params: Dictionary of query parameters
-        
+    Inserts multiple rows into a Supabase table.
+
+    Parameters:
+        table_name (str): The name of the Supabase table.
+        data_list (list): A list of dictionaries, each representing a row.
+
     Returns:
-        Query results or error message
+        list: List of inserted row data if successful, None otherwise.
     """
-    client = get_supabase_client()
-    
-    if client is None:
-        return {'error': 'Supabase client not initialized'}
-    
+    if not data_list or not isinstance(data_list, list):
+        print("Invalid data for insertion.")
+        return None
+
     try:
-        # Start building the query
-        query = client.table(table_name).select('*')
-        
-        # Apply filters if provided
-        if query_params:
-            if 'limit' in query_params:
-                query = query.limit(query_params['limit'])
-            
-            if 'filters' in query_params:
-                for column, value in query_params['filters'].items():
-                    query = query.eq(column, value)
-        
-        # Execute the query
-        response = query.execute()
-        
-        return {
-            'success': True,
-            'data': response.data
-        }
+        response = supabase_client.table(table_name).insert(data_list).execute()
+        if response.data:
+            return response.data
+        else:
+            print("Insertion failed:", response.error)
+            return None
     except Exception as e:
-        return {
-            'success': False,
-            'error': str(e)
-        } 
+        print(f"Supabase insertion error: {e}")
+        return None
+
+# RETRIEVE BY ID
+def get_row_by_id(table_name: str, id_field: str, id_value):
+    """Retrieve a single row by its ID field (usually primary key)."""
+    response = supabase_client.table(table_name).select("*").eq(id_field, id_value).execute()
+    return response.data if response.data else response.error
+
+# RETRIEVE BY MULTIPLE FIELDS
+def get_rows_by_filters(table_name: str, filters: dict):
+    """Retrieve rows matching multiple filters (e.g., {'user_id': 1, 'status': 'done'})."""
+    query = supabase_client.table(table_name).select("*")
+    for field, value in filters.items():
+        query = query.eq(field, value)
+    response = query.execute()
+    return response.data if response.data else response.error
+
+# UPDATE BY ID
+def update_row_by_id(table_name: str, id_field: str, id_value, updated_data: dict):
+    """Update a row based on its ID field."""
+    response = supabase_client.table(table_name).update(updated_data).eq(id_field, id_value).execute()
+    return response.data if response.data else response.error
+
+# DELETE BY ID
+def delete_row_by_id(table_name: str, id_field: str, id_value):
+    """Delete a row based on its ID field."""
+    response = supabase_client.table(table_name).delete().eq(id_field, id_value).execute()
+    return response.data if response.data else response.error
