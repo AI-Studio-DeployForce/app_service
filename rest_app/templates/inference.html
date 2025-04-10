@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% block extra_head %}
+<!-- Leaflet.js CSS and JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+crossorigin=""/>
+{% endblock %}
+{% block title %}Inference Result{% endblock %}
+{% block content %}
+<div class="container mt-2 mb-2">
+    <div class="row justify-content-center gx-5">
+        <!-- Wrapper div to horizontally center both columns -->
+        <div class="d-flex justify-content-center flex-wrap gap-5">
+
+            <!-- Left Column: Toggleable Disaster Images and Map -->
+            <div class="text-center">
+                <h5 class="mb-3">Post Disaster Image</h5>
+                <div class="image-square-wrapper position-relative mb-2" id="image-container">
+                    <img id="toggleImage" src="{{ image_urls.0 }}" class="img-fluid rounded shadow-sm image-square" alt="Disaster Image">
+                    <div id="map" class="image-square-wrapper mb-2 d-none rounded shadow-sm"></div>
+                </div>
+
+                <div class="mt-2 d-flex justify-content-center gap-2">
+                    <button class="btn btn-outline-primary" onclick="toggleImage()">Toggle</button>
+                    <button class="btn btn-outline-info" onclick="toggleMap()">Map View</button>
+                </div>
+            </div>
+
+            <!-- Right Column: Segmentation Result -->
+            <div class="text-center">
+                <h5 class="mb-3">Segmentation Result</h5>
+                <div class="image-square-wrapper">
+                    <img src="{{ mask_urls.0 }}" class="img-fluid rounded shadow-sm image-square" alt="Mask Result">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="text-center mt-4">
+        <a href="{% url 'upload' %}" class="btn btn-secondary me-3">Upload Images</a>
+        <a href="{{ report_url }}" class="btn btn-success" target="_blank">Generate Report</a>
+    </div>
+</div>
+
+<div id="hover-tooltip"></div>
+
+<style>
+    .image-square-wrapper {
+        width: 400px;
+        aspect-ratio: 1 / 1;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .image-square {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border: 2px solid #dee2e6;
+    }
+
+    #map {
+        width: 100%;
+        height: 100%;
+    }
+
+    #hover-tooltip {
+        position: absolute;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        padding: 5px 8px;
+        font-size: 12px;
+        border-radius: 4px;
+        pointer-events: none;
+        display: none;
+        z-index: 1000;
+    }
+
+    img[alt="Mask Result"]:hover {
+        cursor: pointer;
+    }
+
+    /* Responsive spacing */
+    main {
+        padding-top: 3rem;
+        padding-bottom: 4rem;
+    }
+
+    .btn {
+        min-width: 120px;
+    }
+
+    .action-buttons {
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
+</style>
+
+
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+crossorigin=""></script>
+
+<script>
+    // leaflet js map handling
+    const images = {{ image_urls|safe }};
+    const coordinates = {{ reference_coords|safe }}; // needs to take the centre for leaflet js map view
+
+    console.log("LEAFLET JS")
+    console.log(coordinates)
+    let currentIndex = 0;
+    let mapVisible = false;
+    let leafletMapInitialized = false;
+
+    function toggleImage() {
+        document.getElementById("map").classList.add("d-none");
+        document.getElementById("toggleImage").classList.remove("d-none");
+        mapVisible = false;
+        currentIndex = (currentIndex + 1) % images.length;
+        document.getElementById('toggleImage').src = images[currentIndex];
+    }
+
+    function toggleMap() {
+        const mapDiv = document.getElementById("map");
+        const image = document.getElementById("toggleImage");
+    
+        if (!mapVisible) {
+            image.classList.add("d-none");
+            mapDiv.classList.remove("d-none");
+    
+            if (!leafletMapInitialized) {
+                console.log("TOGGLE")
+                console.log(coordinates)
+                // Init Leaflet map
+                const centerLat = coordinates.center[0];
+                const centerLon = coordinates.center[1];
+                window.mapInstance = L.map('map').setView([centerLat, centerLon], 17);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(window.mapInstance);
+
+                L.marker([centerLat, centerLon]).addTo(window.mapInstance)
+                    .bindPopup("Disaster Location").openPopup();
+    
+                leafletMapInitialized = true;
+            } else {
+                // Required for proper re-rendering after showing
+                setTimeout(() => {
+                    window.mapInstance.invalidateSize();
+                }, 100);  // Delay ensures the element is visible before resizing
+            }
+    
+            mapVisible = true;
+        } else {
+            mapDiv.classList.add("d-none");
+            image.classList.remove("d-none");
+            mapVisible = false;
+        }
+    }
+
+    // popup hover tooltip handling
+    const referenceCoords = {{ reference_coords|safe }};
+    const maskImg = document.querySelector('img[alt="Mask Result"]');
+    const tooltip = document.getElementById('hover-tooltip');
+    let currentLat = null;
+    let currentLon = null;
+
+    if (maskImg) {
+        maskImg.addEventListener('mousemove', (e) => {
+            const rect = maskImg.getBoundingClientRect();
+            const xRatio = (e.clientX - rect.left) / rect.width;
+            const yRatio = (e.clientY - rect.top) / rect.height;
+
+            const interpolate = (p1, p2, ratio) => p1 + (p2 - p1) * ratio;
+
+            // Interpolate top edge and bottom edge
+            const topLat = interpolate(referenceCoords.top_left[0], referenceCoords.top_right[0], xRatio);
+            const topLon = interpolate(referenceCoords.top_left[1], referenceCoords.top_right[1], xRatio);
+            const bottomLat = interpolate(referenceCoords.bottom_left[0], referenceCoords.bottom_right[0], xRatio);
+            const bottomLon = interpolate(referenceCoords.bottom_left[1], referenceCoords.bottom_right[1], xRatio);
+
+            // Final interpolation between top and bottom
+            const lat = interpolate(topLat, bottomLat, yRatio);
+            const lon = interpolate(topLon, bottomLon, yRatio);
+
+            // Final interpolation between top and bottom
+            currentLat = lat
+            currentLon = lon
+
+            // Show tooltip
+            tooltip.style.left = `${e.pageX + 10}px`;
+            tooltip.style.top = `${e.pageY + 10}px`;
+            tooltip.innerText = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+            tooltip.style.display = 'block';
+        });
+
+        maskImg.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+
+        maskImg.addEventListener('click', () => {
+            if (currentLat !== null && currentLon !== null) {
+                const url = `https://www.google.com/maps?q=${currentLat},${currentLon}`;
+                window.open(url, '_blank');
+            }
+        });
+    }
+</script>
+{% endblock %}
