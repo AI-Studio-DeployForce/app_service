@@ -1,71 +1,173 @@
+/* Base styles */
 body {
-  background: #f8f9fa;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: url('/static/img/disaster-bg.png') no-repeat center center fixed, linear-gradient(to bottom,#fffdf3, #fefae0);
+  background-size: contain;
   color: #212529;
+  margin: 0;
+  padding: 0;
+  backdrop-filter: blur(1px);
+  font-family: 'Cormorant Garamond','Poppins', sans-serif;
+  font-size: 18px;
+  color: #333;
 }
 
-header {
-  background-color: #1a1a2e;
+/* Header + Footer */
+.custom-header {
+  background-color: #2b9348; /* rich green */
+  min-height: 70px;
+  padding: 10px 20px;
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: #ffffff;
+  border-radius: 0 0 24px 24px;
+}
+
+.custom-header .logo-img {
+  height: 48px;
+  width: auto;
+}
+
+.custom-header .tagline {
+  font-size: 1.4rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* Make header text responsive */
+@media (max-width: 768px) {
+  .custom-header .tagline {
+      font-size: 1rem;
+  }
+}
+
+.site-footer {
+  background-color: #1b4332;
+  color: #d4f1df;
   padding: 1rem 0;
-  color: white;
-  text-align: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 24px 24px 0 0;
 }
 
-footer {
-  background-color: #1a1a2e;
-  color: white;
-  padding: 1rem;
-  text-align: center;
-  /* position: relative; */
-  /* bottom: 0; */
-  width: 100%;
-}
-
+/* Container Styling */
 .container {
-  max-width: 960px;
-  margin: 2rem auto;
-  padding: 1.5rem;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+  max-width: 1000px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
 
+/* Typography */
+h1, h2, h3 {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+/* Buttons */
 .btn-primary {
   background-color: #4a47a3;
   border: none;
   transition: background-color 0.3s ease;
 }
-
 .btn-primary:hover {
-  background-color: #383378;
+  background-color: #3a358a;
 }
 
+.btn-success {
+  background-color: #3d9970;
+  border: none;
+}
+.btn-success:hover {
+  background-color: #2e7c57;
+}
+
+.btn-outline-info {
+  border-color: #17a2b8;
+  color: #17a2b8;
+}
+.btn-outline-info:hover {
+  background-color: #17a2b8;
+  color: #fff;
+}
+
+/* Images */
 img {
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  margin-bottom: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  max-width: 100%;
 }
 
-h1, h2 {
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 1.2rem;
+  }
+
+  .btn {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+}
+
+/* Smooth intro animation */
+.fade-in {
+  animation: fadeIn 0.7s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* HERO SECTION */
+.hero-section {
+  padding: 3rem 2rem;
+  /* background: linear-gradient(to right, #ddeefc, #ffffff); */
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.8s ease-in;
+  background: url('/static/img/nature-pattern.jpg') center center;
+  background-size: cover;
+  backdrop-filter: blur(2px);
+}
+
+.hero-heading {
+  font-size: 2rem;
   font-weight: 600;
+  color: #2C3E50;
 }
 
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-main {
-  min-height: 60vh;
-}
-
-/* Optional: center small content vertically with consistent spacing */
-.centered-content {
+/* FEATURE ICONS */
+.icon-circle {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  font-size: 32px;
+  color: #fff;
   display: flex;
-  justify-content: center;
   align-items: center;
-  min-height: 40vh;
-  text-align: center;
+  justify-content: center;
+  margin: 0 auto;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* FEATURE CARD */
+.feature-card {
+  padding: 1.5rem 1rem;
+  background: #f9f9f9;
+  border-radius: 0.75rem;
+  margin-bottom: 20px;
+  transition: transform 0.3s ease;
+}
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+
+/* Fade Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }

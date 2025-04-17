@@ -71,7 +71,7 @@ def inference(request):
         #     return JsonResponse({'status': 'error', 'message': f"Inference API error: {e}"}, status=500)
         
         # Dummy inference results
-        mask_url = "https://resizing.flixster.com/TNUObVesnGUFtTYveu0dAVb2tlg=/fit-in/352x330/v2/https://resizing.flixster.com/-XZAfHZM39UwaGJIFWKAE8fS0ak=/v3/t/assets/720474_v9_bc.jpg"
+        mask_url = "https://miro.medium.com/v2/resize:fit:1400/1*B16t8Do6hvuq2Q_2YOM-UQ.png"
 
         # TODO: process report here, after that upload that report to cloudinary and get the URL
         report_url = "https://www.nrma.com.au/content/dam/insurance-brands-aus/nrma/au/en/documents/car/nrma-car-pds-nrmamotpds-rev2-0923.pdf"
@@ -122,7 +122,7 @@ def inference(request):
             reference_coords = transform_five_reference_coords(image_size, geo_transform)
 
             return render(request, 'inference.html', {
-                'image_urls': [cloudinary_urls[pre_img], cloudinary_urls[post_img]],
+                'image_urls': {"pre": cloudinary_urls[pre_img], "post": cloudinary_urls[post_img]},
                 'mask_urls': [mask_url],
                 'report_url': report_url,
                 'reference_coords': reference_coords
@@ -228,12 +228,48 @@ def inference(request):
 
 #     return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400) 
 
+
 def generate_pdf_report(request):
+    summary = {
+        "Destroyed": 12,
+        "Major Damage": 32,
+        "Minor Damage": 12,
+        "No Damage": 53
+    }
+    total = sum(summary.values())
+    summary_stats = []
+
+    for category, count in summary.items():
+        percent = f"{round((count / total) * 100)}%" if total > 0 else "0%"
+        summary_stats.append({
+            "category": category,
+            "count": count,
+            "percentage": percent
+        })
+
     context = {
-        'title': 'Damage Report',
-        'buildings': [
-            {'id': 1, 'severity': 'Destroyed', 'lat': 12.34, 'lon': 56.78},
-            {'id': 2, 'severity': 'Major', 'lat': 12.35, 'lon': 56.79},
-        ]
+        "summary_stats": summary_stats,
+        "total": total,
+        "image_data": [
+            {
+                "post_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744872975/deployforce/s6t9aeht98vnnrk8y5v6.png",
+                "mask_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744871447/deployforce/z4iasrbespq1qtu1j5lq.png",
+                "buildings": [
+                    {"id": 1, "lat": 14.4143, "lon": -90.8230, "severity": "Destroyed"},
+                    {"id": 2, "lat": 14.4144, "lon": -90.8231, "severity": "Destroyed"},
+                    {"id": 3, "lat": 14.4145, "lon": -90.8232, "severity": "Major Damage"},
+                ]
+            },
+            {
+                "post_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744872975/deployforce/s6t9aeht98vnnrk8y5v6.png",
+                "mask_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744871447/deployforce/z4iasrbespq1qtu1j5lq.png",
+                "buildings": [
+                    {"id": 1, "lat": 14.4150, "lon": -90.8240, "severity": "Destroyed"},
+                    {"id": 2, "lat": 14.4151, "lon": -90.8241, "severity": "Minor Damage"},
+                    {"id": 3, "lat": 14.4152, "lon": -90.8242, "severity": "Major Damage"},
+                ]
+            }
+        ],
+        "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     return render_to_pdf('report.html', context)

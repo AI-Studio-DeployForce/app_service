@@ -1,11 +1,109 @@
-{% extends 'base.html' %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to DeployForce</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-{% block title %}Home - Damage Assessment{% endblock %}
+    <!-- Bootstrap CSS & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 
-{% block content %}
-<div class="container text-center">
-    <h1 class="mb-4">Welcome to <span style="color:#4a47a3;">DeployForce</span></h1>
-    <p class="lead mb-4">A smart AI tool to assess building damage severity from satellite images.</p>
-    <a href="{% url 'upload' %}" class="btn btn-primary btn-lg">Get Started</a>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+
+    <!-- Font: Noto Sans or Urbanist for natural/environmental theme -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            background: linear-gradient(to right, #fffdf3, #f5f5e9);
+        }
+        .home-hero {
+            background-color: #f0fdf4;
+            border-left: 6px solid #48bb78;
+        }
+        .hero-img {
+            max-width: 400px;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .feature-box {
+            background-color: #ffffff;
+            transition: all 0.3s ease-in-out;
+        }
+        .feature-box:hover {
+            transform: translateY(-5px);
+            background-color: #f8fff8;
+            box-shadow: 0 6px 20px rgba(72, 187, 120, 0.1);
+        }
+        .icon-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Hero Section -->
+<div class="container mt-5 mb-5">
+    <div class="home-hero d-flex flex-column flex-lg-row align-items-center justify-content-between p-5 rounded shadow-sm mb-5">
+        <div class="text-section text-lg-start text-center">
+            <h1 class="display-5 fw-bold mb-3">Empowering Rapid Disaster Response with AI</h1>
+            <p class="lead text-muted mb-4">Upload satellite images, assess structural damage, and generate geospatial reports in seconds.</p>
+            <a href="{% url 'upload' %}" class="btn btn-success btn-lg">Start Damage Assessment</a>
+        </div>
+        <div class="image-section mt-4 mt-lg-0 ms-lg-5 text-center">
+            <img src="{% static 'img/disaster-bg.png' %}" alt="AI Disaster Illustration" class="img-fluid hero-img">
+        </div>
+    </div>
 </div>
-{% endblock %}
+
+<!-- Features Section -->
+<div class="container mb-5">
+    <div class="row text-center gy-4">
+        <div class="col-md-4">
+            <div class="feature-box p-4 h-100 shadow-sm rounded">
+                <div class="icon-circle bg-primary text-white mb-3">
+                    <i class="bi bi-image-fill fs-2"></i>
+                </div>
+                <h5 class="fw-bold">AI Image Segmentation</h5>
+                <p class="text-muted">Detect and classify building damage severity from satellite images using state-of-the-art ML models.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-box p-4 h-100 shadow-sm rounded">
+                <div class="icon-circle bg-success text-white mb-3">
+                    <i class="bi bi-geo-alt-fill fs-2"></i>
+                </div>
+                <h5 class="fw-bold">Geo-Intelligent Mapping</h5>
+                <p class="text-muted">Convert image pixels to latitude & longitude for precise geospatial analysis and mapping.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-box p-4 h-100 shadow-sm rounded">
+                <div class="icon-circle bg-info text-white mb-3">
+                    <i class="bi bi-file-earmark-text-fill fs-2"></i>
+                </div>
+                <h5 class="fw-bold">Automated PDF Reports</h5>
+                <p class="text-muted">Generate detailed damage reports with map overlays, summaries, and building-level breakdowns.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<div class="text-center text-muted small mt-4 mb-4">
+    <p>Built with 💡 by DeployForce — turning data into disaster resilience.</p>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
