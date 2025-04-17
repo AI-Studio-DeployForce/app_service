@@ -1,0 +1,67 @@
+
+/* inference.css */
+
+.container {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+}
+
+.image-square-wrapper {
+    width: 400px;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    position: relative;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease;
+}
+
+.image-square-wrapper:hover {
+    transform: scale(1.01);
+}
+
+.image-square {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: 2px solid #cce3d2;
+    border-radius: 10px;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+}
+
+#hover-tooltip {
+    position: absolute;
+    background-color: rgba(34, 139, 34, 0.9);
+    color: #ffffff;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    pointer-events: none;
+    display: none;
+    z-index: 1000;
+    font-weight: 500;
+}
+
+img[alt="Mask Result"]:hover {
+    cursor: crosshair;
+}
+
+button.btn {
+    min-width: 130px;
+    font-weight: 500;
+}
+
+.btn-outline-info:hover {
+    background-color: #0dcaf0;
+    color: #fff;
+}
+
+.action-buttons {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}

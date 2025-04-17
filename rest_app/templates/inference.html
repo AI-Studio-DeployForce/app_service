@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
 {% block extra_head %}
-<!-- Leaflet.js CSS and JS -->
+{% load static %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-crossorigin=""/>
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+<link rel="stylesheet" href="{% static 'css/inference.css' %}">
 {% endblock %}
 {% block title %}Inference Result{% endblock %}
 {% block content %}
@@ -14,9 +15,9 @@ crossorigin=""/>
 
             <!-- Left Column: Toggleable Disaster Images and Map -->
             <div class="text-center">
-                <h5 class="mb-3">Post Disaster Image</h5>
+                <h5 class="mb-3" id="image-label">Pre-Disaster Image</h5>
                 <div class="image-square-wrapper position-relative mb-2" id="image-container">
-                    <img id="toggleImage" src="{{ image_urls.0 }}" class="img-fluid rounded shadow-sm image-square" alt="Disaster Image">
+                    <img id="toggleImage" src="{{ image_urls.pre }}" class="img-fluid rounded shadow-sm image-square" alt="Disaster Image">
                     <div id="map" class="image-square-wrapper mb-2 d-none rounded shadow-sm"></div>
                 </div>
 
@@ -112,55 +113,63 @@ crossorigin=""></script>
     const images = {{ image_urls|safe }};
     const coordinates = {{ reference_coords|safe }}; // needs to take the centre for leaflet js map view
 
-    console.log("LEAFLET JS")
-    console.log(coordinates)
     let currentIndex = 0;
     let mapVisible = false;
     let leafletMapInitialized = false;
+    let currentView = 'pre';  // Initial state
 
     function toggleImage() {
-        document.getElementById("map").classList.add("d-none");
-        document.getElementById("toggleImage").classList.remove("d-none");
+        const imageEl = document.getElementById("toggleImage");
+        const mapEl = document.getElementById("map");
+        const labelEl = document.getElementById("image-label");
+
+        mapEl.classList.add("d-none");
+        imageEl.classList.remove("d-none");
+
+        if (currentView === 'pre') {
+            currentView = 'post';
+            imageEl.src = images.post;
+            labelEl.textContent = "Post-Disaster Image";
+        } else {
+            currentView = 'pre';
+            imageEl.src = images.pre;
+            labelEl.textContent = "Pre-Disaster Image";
+        }
+
         mapVisible = false;
-        currentIndex = (currentIndex + 1) % images.length;
-        document.getElementById('toggleImage').src = images[currentIndex];
     }
 
     function toggleMap() {
-        const mapDiv = document.getElementById("map");
-        const image = document.getElementById("toggleImage");
-    
-        if (!mapVisible) {
-            image.classList.add("d-none");
-            mapDiv.classList.remove("d-none");
-    
-            if (!leafletMapInitialized) {
-                console.log("TOGGLE")
-                console.log(coordinates)
-                // Init Leaflet map
-                const centerLat = coordinates.center[0];
-                const centerLon = coordinates.center[1];
-                window.mapInstance = L.map('map').setView([centerLat, centerLon], 17);
+        const mapEl = document.getElementById("map");
+        const imageEl = document.getElementById("toggleImage");
+        const labelEl = document.getElementById("image-label");
 
+        if (!mapVisible) {
+            imageEl.classList.add("d-none");
+            mapEl.classList.remove("d-none");
+            labelEl.textContent = "Disaster Location Map";
+
+            if (!leafletMapInitialized) {
+                const map = L.map('map').setView([coordinates.center[0], coordinates.center[1]], 17);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors'
-                }).addTo(window.mapInstance);
-
-                L.marker([centerLat, centerLon]).addTo(window.mapInstance)
+                }).addTo(map);
+                L.marker([coordinates.center[0], coordinates.center[1]]).addTo(map)
                     .bindPopup("Disaster Location").openPopup();
-    
+
+                window.mapInstance = map;
                 leafletMapInitialized = true;
             } else {
-                // Required for proper re-rendering after showing
                 setTimeout(() => {
                     window.mapInstance.invalidateSize();
-                }, 100);  // Delay ensures the element is visible before resizing
+                }, 100);
             }
-    
+
             mapVisible = true;
         } else {
-            mapDiv.classList.add("d-none");
-            image.classList.remove("d-none");
+            mapEl.classList.add("d-none");
+            imageEl.classList.remove("d-none");
+            labelEl.textContent = currentView === 'pre' ? "Pre-Disaster Image" : "Post-Disaster Image";
             mapVisible = false;
         }
     }

@@ -6,42 +6,41 @@
     <title>{% block title %}DeployForce{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap CSS -->
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    
     <!-- Custom Styles -->
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
     {% block extra_head %}{% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100">
 
     <!-- Header -->
-    <header class="text-white text-center shadow" style="background-color: #1a1a2e;">
-          <h1 class="mb-0">DeployForce</h1>
-          <p class="mb-0">AI-Powered Disaster Damage Assessment</p>
+    <header class="custom-header shadow-sm d-flex align-items-center justify-content-between px-4 py-2">
+        <a href="{% url 'home' %}">
+            <img src="{% static 'img/logo.png' %}" alt="DeployForce Logo" class="logo-img">
+        </a>
+        <h2 class="tagline mb-0 text-white">AI for Rapid Disaster Insights</h2>
     </header>
 
     <!-- Main Content -->
-    <div>
-        <main class="flex-grow-1 d-flex justify-content-center align-items-center py-4">
-            <div class="w-100 px-3">
-                {% block content %}{% endblock %}
-            </div>
-        </main>
-    </div>
-    
+    <main class="flex-grow-1 py-5">
+        {% block content %}{% endblock %}
+    </main>
 
     <!-- Footer -->
-    <footer class="text-center text-white py-3 mt-auto" style="background-color: #1a1a2e;">
+    <footer class="site-footer text-white text-center mt-auto">
         &copy; {{ now|date:"Y" }} DeployForce. All rights reserved.
     </footer>
 
-    <!-- Bootstrap JS -->
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-    <!-- Custom JS -->
     <script src="{% static 'js/main.js' %}"></script>
-
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

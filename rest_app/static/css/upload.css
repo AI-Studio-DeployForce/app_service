@@ -1,0 +1,40 @@
+.upload-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 0;
+    opacity: 0.97;
+}
+  
+.upload-card {
+    background-color: #ffffff;
+    padding: 2.5rem 2rem;
+    border-radius: 1rem;
+    max-width: 700px;
+    width: 100%;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+    border-left: 5px solid #2b9348;
+    background-image: url('/static/img/leaf-pattern.png');
+    background-repeat: no-repeat;
+    background-position: bottom right;
+    background-size: 120px;
+}
+  
+.upload-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+    color: #2f855a;
+    font-size: 1.75rem;
+}
+  
+.upload-input {
+    padding: 1rem;
+    background-color: #f0fff4;
+    border: 2px dashed #c6f6d5;
+    border-radius: 8px;
+    transition: border-color 0.3s ease;
+}
+  
+.upload-input:hover {
+    border-color: #38a169;
+}
