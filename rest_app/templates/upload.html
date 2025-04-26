@@ -4,13 +4,46 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/upload.css' %}">
+<script src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs" type="module"></script>
+<style>
+  /* Overlay */
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(1px);
+    display: none; /* Initially hidden */
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .loading-overlay.active {
+    display: flex;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <dotlottie-player 
+      src="https://lottie.host/2a0fa08b-6c80-4f1e-aec5-82df52aef7e9/vRt8FpFYPR.lottie"
+      background="transparent" 
+      speed="1" 
+      style="width: 300px; height: 300px;" 
+      loop 
+      autoplay>
+    </dotlottie-player>
+</div>
+
 <div class="upload-wrapper">
     <div class="upload-card shadow fade-in">
         <h2 class="upload-title text-center mb-4">Upload Satellite Data</h2>
-        <form action="{% url 'inference' %}" method="post" enctype="multipart/form-data">
+        <form id="uploadForm" action="{% url 'inference' %}" method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="mb-4">
                 <label for="image_files" class="form-label">Satellite Images (Pre & Post Disaster)</label>
@@ -34,4 +67,13 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+  const form = document.getElementById('uploadForm');
+  const overlay = document.getElementById('loadingOverlay');
+
+  form.addEventListener('submit', function() {
+      overlay.classList.add('active');
+  });
+</script>
 {% endblock %}
