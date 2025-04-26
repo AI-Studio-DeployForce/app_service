@@ -2,12 +2,14 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from datetime import datetime
 import json
-import cloudinary.uploader
 from rest_app.config.cloudinary import upload_file
 from django.conf import settings
 import requests
-from rest_app.utils import transform_five_reference_coords, render_to_pdf, validate_json_structure, validate_uploaded_images
+from rest_app.utils import transform_five_reference_coords, render_to_pdf, validate_json_structure, validate_uploaded_images, split_filename_and_extension, generate_pdf_report
 from rest_app.config.supabase import insert_row, insert_multiple_rows
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 IMAGE_SIZE = (512, 512)  # Width x Height of the mask or satellite image
 
@@ -22,12 +24,12 @@ def inference(request):
         image_files = request.FILES.getlist('image_files')
         json_file = request.FILES.get('json_file')
 
-        # Validate image pairs
+        # Step 1: Validate image pairs
         valid_images, base_names = validate_uploaded_images(image_files)
         if not valid_images:
             return JsonResponse({'status': 'error', 'message': 'Image pairs (pre/post) are incomplete or mismatched.'}, status=400)
 
-        # Validate JSON structure
+        # Step 2: Validate JSON
         try:
             json_data = json.load(json_file)
             if not validate_json_structure(json_data, base_names):
@@ -35,241 +37,103 @@ def inference(request):
         except json.JSONDecodeError:
             return JsonResponse({'status': 'error', 'message': 'Invalid JSON format.'}, status=400)
 
-        # Upload images to Cloudinary
-        cloudinary_urls = {}
-        for image in image_files:
-            result = upload_file(image)
-            cloudinary_urls[image.name] = result['secure_url']
+        # Step 3: Upload to Cloudinary
+        cloudinary_payload = []  # [{"pre_name.png": url, "post_name.png": url}, ...]
+        image_map = {img.name: img for img in image_files}
+        cloudinary_mapping = {}  # flat map for lookup later
 
-        # # TODO: call the inference API, the code below is just a temporary dummy data
-        # payload = {
-        #     'images': list(cloudinary_urls.values()),
-        # }
-        # response = {
-        #     "mask_image_urls": ["https://resizing.flixster.com/TNUObVesnGUFtTYveu0dAVb2tlg=/fit-in/352x330/v2/https://resizing.flixster.com/-XZAfHZM39UwaGJIFWKAE8fS0ak=/v3/t/assets/720474_v9_bc.jpg"],
-        #     "damage_severities": [{
-        #         "num_no_damage": 5,
-        #         "num_minor_damage": 10,
-        #         "num_major_damage": 3,
-        #         "num_destroyed": 2,
-        #     }],
-        #     "image_urls": [{"pre_disaster": "", "post_disaster": ""}],
-        # }
-        # # NOTE: image_urls are used to align the prediction results with particular image pair
+        for base in base_names:
+            pre_name = f"{base}_pre_disaster.png"
+            post_name = f"{base}_post_disaster.png"
+            upload_pair = {}
 
-        # try:
-        #     response = requests.post(settings.INFERENCE_API_URL, json=payload)
-        #     if response.status_code != 200:
-        #         return JsonResponse({'status': 'error', 'message': 'Inference API failed'}, status=500)
+            for img_name in [pre_name, post_name]:
+                if img_name not in image_map:
+                    return JsonResponse({'status': 'error', 'message': f"Missing file: {img_name}"}, status=400)
+                upload_result = upload_file(image_map[img_name], folder="inputs", public_id=img_name)
+                if not upload_result['success']:
+                    return JsonResponse({'status': 'error', 'message': f"Failed to upload {img_name}: {upload_result['error']}"}, status=500)
 
-        #     inference_data = response.json()
-        #     mask_urls = inference_data.get("mask_image_urls", [])
-        #     damage_stats = inference_data.get("damage_severities", [])
-        #     image_mappings = inference_data.get("image_urls", [])
+                upload_pair[img_name] = upload_result['secure_url']
+                cloudinary_mapping[img_name] = upload_result['secure_url']
 
-        # except Exception as e:
-        #     return JsonResponse({'status': 'error', 'message': f"Inference API error: {e}"}, status=500)
-        
-        # Dummy inference results
-        mask_url = "https://miro.medium.com/v2/resize:fit:1400/1*B16t8Do6hvuq2Q_2YOM-UQ.png"
+            cloudinary_payload.append(upload_pair)
 
-        # TODO: process report here, after that upload that report to cloudinary and get the URL
-        report_url = "https://www.nrma.com.au/content/dam/insurance-brands-aus/nrma/au/en/documents/car/nrma-car-pds-nrmamotpds-rev2-0923.pdf"
-        
-        image_size = IMAGE_SIZE
+        # Step 4: Call Flask Prediction API
+        try:
+            print(os.getenv('INFERENCE_API_URL', 'http://127.0.0.1:8001/predict'))
+            flask_response = requests.post(
+                os.getenv('INFERENCE_API_URL', 'http://127.0.0.1:8001/predict'),
+                json={'images': cloudinary_payload},
+                timeout=50
+            )
+            if flask_response.status_code != 200:
+                return JsonResponse({'status': 'error', 'message': 'Flask prediction failed'}, status=500)
+            flask_data = flask_response.json()
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'Flask call failed: {str(e)}'}, status=500)
 
-        # Insert header
-        execution_header = {
+        # Step 5: Save to Supabase
+        header_inserted = insert_row("execution_headers", {
             "upload_time": datetime.utcnow().isoformat(),
-            "report_url": report_url,
-        }
-        header_inserted = insert_row("execution_headers", execution_header)
+        })
         header_id = header_inserted[0].get("id") if header_inserted else None
 
-        # Insert details with geo_params
         detail_entries = []
-        for base in base_names:
-            pre_img = [k for k in cloudinary_urls if f"{base}_pre_disaster" in k][0]
-            post_img = [k for k in cloudinary_urls if f"{base}_post_disaster" in k][0]
+        for idx, base in enumerate(base_names):
+            pre_img = [k for k in cloudinary_mapping if f"{base}_pre_disaster" in k][0]
+            post_img = [k for k in cloudinary_mapping if f"{base}_post_disaster" in k][0]
+            pre_mask_url = flask_data["mask_image_urls"][idx].get(pre_img)
+            post_mask_url = flask_data["mask_image_urls"][idx].get(post_img)
+            damage = flask_data["damage_severities"][idx]
 
-            # Get geo_params by pre_img name
             geo_key = pre_img
             geo_params = json_data.get(geo_key, [])[0] if isinstance(json_data.get(geo_key), list) else None
 
             detail_entries.append({
                 "header_id": header_id,
                 "pre_image_name": pre_img,
-                "pre_image_url": cloudinary_urls[pre_img],
+                "pre_image_url": cloudinary_mapping[pre_img],
                 "post_image_name": post_img,
-                "post_image_url": cloudinary_urls[post_img],
-                "mask_image_name": "simulated_mask.png",
-                "mask_image_url": mask_url,
-                "num_no_damage": 5,
-                "num_minor_damage": 10,
-                "num_major_damage": 3,
-                "num_destroyed": 2,
+                "post_image_url": cloudinary_mapping[post_img],
+                "localisation_mask_name": f"{split_filename_and_extension(pre_img)[0]}_mask{split_filename_and_extension(pre_img)[1]}",
+                "localisation_mask_url": pre_mask_url,
+                "damage_mask_name": f"{split_filename_and_extension(post_img)[0]}_mask{split_filename_and_extension(post_img)[1]}",
+                "damage_mask_url": post_mask_url,
+                "num_no_damage": damage.get("num_no_damage", 0),
+                "num_minor_damage": damage.get("num_minor_damage", 0),
+                "num_major_damage": damage.get("num_major_damage", 0),
+                "num_destroyed": damage.get("num_destroyed", 0),
                 "geo_params": geo_params
             })
 
         insert_multiple_rows("execution_details", detail_entries)
 
-        # If single image pair → navigate to inference page
-        if len(base_names) == 1:
-            # Get reference coords
-            geo_transform = {
-                list(json_data.keys())[0]: json_data[list(json_data.keys())[0]]
-            }
-            reference_coords = transform_five_reference_coords(image_size, geo_transform)
+         # Step 6: Report Generation
+        report_url, error = generate_pdf_report(header_id, detail_entries)
+        if not report_url:
+            return JsonResponse({'status': 'error', 'message': error}, status=500)
 
+        # Step 7: Render single inference or upload summary
+        if len(base_names) == 1:
+            image_size = IMAGE_SIZE
+            reference_coords = transform_five_reference_coords(
+                image_size,
+                {base_names[0] + "_pre_disaster.png": json_data.get(base_names[0] + "_pre_disaster.png")}
+            )
             return render(request, 'inference.html', {
-                'image_urls': {"pre": cloudinary_urls[pre_img], "post": cloudinary_urls[post_img]},
-                'mask_urls': [mask_url],
+                'image_urls': {"pre": cloudinary_mapping[pre_img], "post": cloudinary_mapping[post_img]},
+                'mask_urls': {
+                    "localisation_mask": flask_data["mask_image_urls"][0][pre_img],
+                    "damage_severity_mask": flask_data["mask_image_urls"][0][post_img]
+                },
                 'report_url': report_url,
                 'reference_coords': reference_coords
             })
 
-        # Multiple pairs → show report
         return render(request, 'upload.html', {
             'success': True,
             'report_url': report_url
         })
 
     return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
-
-
-# def inference(request):
-#     if request.method == 'POST':
-#         coordinates = {"lat": 14.414359, "lon": -90.823070}
-
-#         # Simulate image size and geo-transform metadata
-#         image_size = (1024, 1024)  # Width x Height of the mask or satellite image
-#         geo_transform = {
-#             "guatemala-volcano_00000020_pre_disaster.png": [
-#                 [-90.82307020932015, 4.488628277641187e-06, 0.0,
-#                  14.414359902299086, 0.0, -4.488628277641187e-06],
-#                 "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,...]"
-#             ]
-#         }
-
-#         # Call util function to get 5 coordinates
-#         reference_coords = transform_five_reference_coords(image_size, geo_transform)
-
-#         return render(request, 'inference.html', {
-#             'image_urls': [
-#                 "https://hips.hearstapps.com/hmg-prod/images/niallhoran-shot1-358-6478b67555832.jpg",
-#                 "https://d27o7y1r7mnbwc.cloudfront.net/media/uploads/clients/leo-woodall/images/gallery/2023-10-26_105555_LeoWoodallHeadshot2.jpg"
-#             ],
-#             'mask_urls': [
-#                 "https://resizing.flixster.com/TNUObVesnGUFtTYveu0dAVb2tlg=/fit-in/352x330/v2/https://resizing.flixster.com/-XZAfHZM39UwaGJIFWKAE8fS0ak=/v3/t/assets/720474_v9_bc.jpg"
-#             ],
-#             'report_url': "https://www.nrma.com.au/content/dam/insurance-brands-aus/nrma/au/en/documents/car/nrma-car-pds-nrmamotpds-rev2-0923.pdf",
-#             'reference_coords': reference_coords  # This is what the frontend will use for interpolation,
-#         })
-
-#         # Handle the uploaded files
-#         image_files = request.FILES.getlist('image_files')
-#         json_file = request.FILES.get('json_file')
-
-#         # Validate image pairs
-#         valid_images, base_names = validate_uploaded_images(image_files)
-#         if not valid_images:
-#             return JsonResponse({'status': 'error', 'message': 'Image pairs (pre/post) are incomplete or mismatched.'}, status=400)
-
-#         # Validate JSON structure
-#         try:
-#             json_data = json.load(json_file)
-#             if not validate_json_structure(json_data, base_names):
-#                 return JsonResponse({'status': 'error', 'message': 'Invalid JSON structure or image name mismatch.'}, status=400)
-#         except json.JSONDecodeError:
-#             return JsonResponse({'status': 'error', 'message': 'Invalid JSON format.'}, status=400)
-
-#         # Validate JSON file
-#         try:
-#             json_data = json.load(json_file)
-#             if not validate_json_structure(json_data):
-#                 return JsonResponse({'status': 'error', 'message': 'Invalid JSON structure'}, status=400)
-#         except json.JSONDecodeError:
-#             return JsonResponse({'status': 'error', 'message': 'Invalid JSON file'}, status=400)
-
-#         # Upload images to Cloudinary
-#         image_urls = []
-#         for image in image_files:
-#             upload_result = cloudinary.uploader.upload(image)
-#             image_urls.append(upload_result['secure_url'])
-
-#         # Prepare data for the API request
-#         api_payload = {
-#             'images': image_urls,
-#             'json_data': json_data
-#         }
-
-#         # Send a REST API request to the microservice
-#         try:
-#             response = requests.post(settings.INFERENCE_API_URL, json=api_payload)
-#             response_data = response.json()
-
-#             # Check for successful response
-#             if response.status_code == 200:
-#                 # Assuming the response contains mask URLs and report URL
-#                 mask_urls = response_data.get('mask_urls', [])
-#                 report_url = response_data.get('report_url', '')
-
-#                 # Redirect to the inference page with the results
-#                 return render(request, 'inference.html', {
-#                     'image_urls': image_urls,
-#                     'mask_urls': mask_urls,
-#                     'report_url': report_url
-#                 })
-#             else:
-#                 return JsonResponse({'status': 'error', 'message': 'Error from inference service'}, status=500)
-
-#         except Exception as e:
-#             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-#     return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400) 
-
-
-def generate_pdf_report(request):
-    summary = {
-        "Destroyed": 12,
-        "Major Damage": 32,
-        "Minor Damage": 12,
-        "No Damage": 53
-    }
-    total = sum(summary.values())
-    summary_stats = []
-
-    for category, count in summary.items():
-        percent = f"{round((count / total) * 100)}%" if total > 0 else "0%"
-        summary_stats.append({
-            "category": category,
-            "count": count,
-            "percentage": percent
-        })
-
-    context = {
-        "summary_stats": summary_stats,
-        "total": total,
-        "image_data": [
-            {
-                "post_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744872975/deployforce/s6t9aeht98vnnrk8y5v6.png",
-                "mask_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744871447/deployforce/z4iasrbespq1qtu1j5lq.png",
-                "buildings": [
-                    {"id": 1, "lat": 14.4143, "lon": -90.8230, "severity": "Destroyed"},
-                    {"id": 2, "lat": 14.4144, "lon": -90.8231, "severity": "Destroyed"},
-                    {"id": 3, "lat": 14.4145, "lon": -90.8232, "severity": "Major Damage"},
-                ]
-            },
-            {
-                "post_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744872975/deployforce/s6t9aeht98vnnrk8y5v6.png",
-                "mask_image_url": "https://res.cloudinary.com/promptvisionai/image/upload/v1744871447/deployforce/z4iasrbespq1qtu1j5lq.png",
-                "buildings": [
-                    {"id": 1, "lat": 14.4150, "lon": -90.8240, "severity": "Destroyed"},
-                    {"id": 2, "lat": 14.4151, "lon": -90.8241, "severity": "Minor Damage"},
-                    {"id": 3, "lat": 14.4152, "lon": -90.8242, "severity": "Major Damage"},
-                ]
-            }
-        ],
-        "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
-    return render_to_pdf('report.html', context)

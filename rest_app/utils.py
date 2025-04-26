@@ -2,6 +2,10 @@ import numpy as np
 from django.template.loader import get_template
 from django.http import HttpResponse
 from xhtml2pdf import pisa
+import os
+from rest_app.config.cloudinary import upload_file
+import tempfile
+from datetime import datetime
 
 def transform_five_reference_coords(image_size, geo_transform):
     """
@@ -100,6 +104,61 @@ def validate_json_structure(json_data, expected_image_names):
 
     return True
 
+def generate_pdf_report(header_id, detail_entries):
+    """
+    Renders the report HTML to PDF, uploads it to Cloudinary, and returns the secure URL.
+    """
+    summary_counts = {
+        "Destroyed": sum(d["num_destroyed"] for d in detail_entries),
+        "Major Damage": sum(d["num_major_damage"] for d in detail_entries),
+        "Minor Damage": sum(d["num_minor_damage"] for d in detail_entries),
+        "No Damage": sum(d["num_no_damage"] for d in detail_entries),
+    }
+    total = sum(summary_counts.values())
+    summary_stats = [
+        {"category": k, "count": v, "percentage": f"{round((v / total) * 100) if total else 0}%"}
+        for k, v in summary_counts.items()
+    ]
+
+    image_data = []
+    for d in detail_entries:
+        # Replace with actual building-level inference in future
+        buildings = [
+            {"id": 1, "lat": 14.4143, "lon": -90.8230, "severity": "Destroyed"},
+            {"id": 2, "lat": 14.4145, "lon": -90.8231, "severity": "Major Damage"},
+        ]
+        image_data.append({
+            "post_image_url": d["post_image_url"],
+            "mask_image_url": d["damage_mask_url"],
+            "buildings": buildings
+        })
+
+    context = {
+        "summary_stats": summary_stats,
+        "total": total,
+        "image_data": image_data,
+        "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    template = get_template("report.html")
+    html = template.render(context)
+
+    # Save PDF to a temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pisa_status = pisa.CreatePDF(html, dest=tmp)
+        pdf_path = tmp.name
+
+    if pisa_status.err:
+        return None, "Failed to generate PDF"
+
+    # Upload PDF to Cloudinary
+    upload_result = upload_file(pdf_path, folder="reports", public_id=f"{header_id}_report")
+    os.remove(pdf_path)
+
+    if upload_result["success"]:
+        return upload_result["secure_url"], None
+    else:
+        return None, upload_result["error"]
+
 def render_to_pdf(template_src, context_dict={}):
     template = get_template(template_src)
     html = template.render(context_dict)
@@ -108,3 +167,16 @@ def render_to_pdf(template_src, context_dict={}):
     if pisa_status.err:
         return HttpResponse('We had some errors <pre>' + html + '</pre>')
     return response
+
+def split_filename_and_extension(filename: str) -> tuple[str, str]:
+    """
+    Split a filename into its base name and extension.
+
+    Args:
+        filename (str): The full filename (e.g., 'image_01.png').
+
+    Returns:
+        tuple[str, str]: A tuple containing (base_name, extension), e.g.,
+                         ('image_01', '.png')
+    """
+    return os.path.splitext(filename)

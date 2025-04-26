@@ -9,32 +9,53 @@
 {% block title %}Inference Result{% endblock %}
 {% block content %}
 <div class="container mt-2 mb-2">
-    <div class="row justify-content-center gx-5">
-        <!-- Wrapper div to horizontally center both columns -->
+    <!-- Pre-disaster + Localisation Mask Row -->
+    <div class="row justify-content-center gx-5 mb-4">
         <div class="d-flex justify-content-center flex-wrap gap-5">
-
-            <!-- Left Column: Toggleable Disaster Images and Map -->
+            <!-- Pre-disaster image -->
             <div class="text-center">
-                <h5 class="mb-3" id="image-label">Pre-Disaster Image</h5>
-                <div class="image-square-wrapper position-relative mb-2" id="image-container">
-                    <img id="toggleImage" src="{{ image_urls.pre }}" class="img-fluid rounded shadow-sm image-square" alt="Disaster Image">
-                    <div id="map" class="image-square-wrapper mb-2 d-none rounded shadow-sm"></div>
+                <h5 class="mb-3" id="pre-image-label">Pre-Disaster Image</h5>
+                <div class="image-square-wrapper position-relative mb-2" id="pre-image-container">
+                    <img id="preImage" src="{{ image_urls.pre }}" class="img-fluid rounded shadow-sm image-square" alt="Pre Image">
+                    <div id="preMap" class="image-square-wrapper mb-2 d-none rounded shadow-sm"></div>
                 </div>
-
-                <div class="mt-2 d-flex justify-content-center gap-2">
-                    <button class="btn btn-outline-primary" onclick="toggleImage()">Toggle</button>
-                    <button class="btn btn-outline-info" onclick="toggleMap()">Map View</button>
+                <div class="mt-2 d-flex justify-content-center">
+                    <button class="btn btn-outline-success" onclick="togglePreMap()">Toggle Map</button>
                 </div>
             </div>
 
-            <!-- Right Column: Segmentation Result -->
+            <!-- Localization Mask -->
             <div class="text-center">
-                <h5 class="mb-3">Segmentation Result</h5>
+                <h5 class="mb-3">Localisation Mask</h5>
                 <div class="image-square-wrapper">
-                    <img src="{{ mask_urls.0 }}" class="img-fluid rounded shadow-sm image-square" alt="Mask Result">
+                    <img src="{{ mask_urls.localisation_mask }}" class="img-fluid rounded shadow-sm image-square" alt="Localization Mask" data-mask="true">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Post-disaster + Damage Severity Mask Row -->
+    <div class="row justify-content-center gx-5 mb-4">
+        <div class="d-flex justify-content-center flex-wrap gap-5">
+            <!-- Post-disaster image -->
+            <div class="text-center">
+                <h5 class="mb-3" id="post-image-label">Post-Disaster Image</h5>
+                <div class="image-square-wrapper position-relative mb-2" id="post-image-container">
+                    <img id="postImage" src="{{ image_urls.post }}" class="img-fluid rounded shadow-sm image-square" alt="Post Image">
+                    <div id="postMap" class="image-square-wrapper mb-2 d-none rounded shadow-sm"></div>
+                </div>
+                <div class="mt-2 d-flex justify-content-center">
+                    <button class="btn btn-outline-info" onclick="togglePostMap()">Toggle Map</button>
                 </div>
             </div>
 
+            <!-- Damage Mask -->
+            <div class="text-center">
+                <h5 class="mb-3">Damage Severity Mask</h5>
+                <div class="image-square-wrapper">
+                    <img src="{{ mask_urls.damage_severity_mask }}" class="img-fluid rounded shadow-sm image-square" alt="Damage Mask" data-mask="true">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -79,7 +100,7 @@
         z-index: 1000;
     }
 
-    img[alt="Mask Result"]:hover {
+    img[data-mask="true"]:hover {
         cursor: pointer;
     }
 
@@ -113,100 +134,89 @@ crossorigin=""></script>
     const images = {{ image_urls|safe }};
     const coordinates = {{ reference_coords|safe }}; // needs to take the centre for leaflet js map view
 
-    let currentIndex = 0;
-    let mapVisible = false;
-    let leafletMapInitialized = false;
-    let currentView = 'pre';  // Initial state
+    const coords = {{ reference_coords|safe }};
+    let preMapInitialized = false, postMapInitialized = false;
 
-    function toggleImage() {
-        const imageEl = document.getElementById("toggleImage");
-        const mapEl = document.getElementById("map");
-        const labelEl = document.getElementById("image-label");
+    function togglePreMap() {
+        const preImage = document.getElementById("preImage");
+        const preMap = document.getElementById("preMap");
+        const label = document.getElementById("pre-image-label");
 
-        mapEl.classList.add("d-none");
-        imageEl.classList.remove("d-none");
+        if (preMap.classList.contains("d-none")) {
+            preImage.classList.add("d-none");
+            preMap.classList.remove("d-none");
+            label.textContent = "Pre-Disaster Map";
 
-        if (currentView === 'pre') {
-            currentView = 'post';
-            imageEl.src = images.post;
-            labelEl.textContent = "Post-Disaster Image";
-        } else {
-            currentView = 'pre';
-            imageEl.src = images.pre;
-            labelEl.textContent = "Pre-Disaster Image";
-        }
-
-        mapVisible = false;
-    }
-
-    function toggleMap() {
-        const mapEl = document.getElementById("map");
-        const imageEl = document.getElementById("toggleImage");
-        const labelEl = document.getElementById("image-label");
-
-        if (!mapVisible) {
-            imageEl.classList.add("d-none");
-            mapEl.classList.remove("d-none");
-            labelEl.textContent = "Disaster Location Map";
-
-            if (!leafletMapInitialized) {
-                const map = L.map('map').setView([coordinates.center[0], coordinates.center[1]], 17);
+            if (!preMapInitialized) {
+                const map = L.map('preMap').setView([coords.center[0], coords.center[1]], 17);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors'
                 }).addTo(map);
-                L.marker([coordinates.center[0], coordinates.center[1]]).addTo(map)
-                    .bindPopup("Disaster Location").openPopup();
-
-                window.mapInstance = map;
-                leafletMapInitialized = true;
+                L.marker([coords.center[0], coords.center[1]]).addTo(map).bindPopup("Pre-disaster location").openPopup();
+                preMapInitialized = true;
             } else {
-                setTimeout(() => {
-                    window.mapInstance.invalidateSize();
-                }, 100);
+                setTimeout(() => window.preMap.invalidateSize(), 100);
             }
-
-            mapVisible = true;
         } else {
-            mapEl.classList.add("d-none");
-            imageEl.classList.remove("d-none");
-            labelEl.textContent = currentView === 'pre' ? "Pre-Disaster Image" : "Post-Disaster Image";
-            mapVisible = false;
+            preImage.classList.remove("d-none");
+            preMap.classList.add("d-none");
+            label.textContent = "Pre-Disaster Image";
+        }
+    }
+
+    function togglePostMap() {
+        const postImage = document.getElementById("postImage");
+        const postMap = document.getElementById("postMap");
+        const label = document.getElementById("post-image-label");
+
+        if (postMap.classList.contains("d-none")) {
+            postImage.classList.add("d-none");
+            postMap.classList.remove("d-none");
+            label.textContent = "Post-Disaster Map";
+
+            if (!postMapInitialized) {
+                const map = L.map('postMap').setView([coords.center[0], coords.center[1]], 17);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                L.marker([coords.center[0], coords.center[1]]).addTo(map).bindPopup("Post-disaster location").openPopup();
+                postMapInitialized = true;
+            } else {
+                setTimeout(() => window.postMap.invalidateSize(), 100);
+            }
+        } else {
+            postImage.classList.remove("d-none");
+            postMap.classList.add("d-none");
+            label.textContent = "Post-Disaster Image";
         }
     }
 
     // popup hover tooltip handling
     const referenceCoords = {{ reference_coords|safe }};
-    const maskImg = document.querySelector('img[alt="Mask Result"]');
     const tooltip = document.getElementById('hover-tooltip');
     let currentLat = null;
     let currentLon = null;
 
-    if (maskImg) {
+    const interpolate = (p1, p2, ratio) => p1 + (p2 - p1) * ratio;
+
+    // Attach listeners to all mask images with data-mask="true"
+    document.querySelectorAll('img[data-mask="true"]').forEach((maskImg) => {
         maskImg.addEventListener('mousemove', (e) => {
             const rect = maskImg.getBoundingClientRect();
             const xRatio = (e.clientX - rect.left) / rect.width;
             const yRatio = (e.clientY - rect.top) / rect.height;
 
-            const interpolate = (p1, p2, ratio) => p1 + (p2 - p1) * ratio;
-
-            // Interpolate top edge and bottom edge
             const topLat = interpolate(referenceCoords.top_left[0], referenceCoords.top_right[0], xRatio);
             const topLon = interpolate(referenceCoords.top_left[1], referenceCoords.top_right[1], xRatio);
             const bottomLat = interpolate(referenceCoords.bottom_left[0], referenceCoords.bottom_right[0], xRatio);
             const bottomLon = interpolate(referenceCoords.bottom_left[1], referenceCoords.bottom_right[1], xRatio);
 
-            // Final interpolation between top and bottom
-            const lat = interpolate(topLat, bottomLat, yRatio);
-            const lon = interpolate(topLon, bottomLon, yRatio);
+            currentLat = interpolate(topLat, bottomLat, yRatio);
+            currentLon = interpolate(topLon, bottomLon, yRatio);
 
-            // Final interpolation between top and bottom
-            currentLat = lat
-            currentLon = lon
-
-            // Show tooltip
             tooltip.style.left = `${e.pageX + 10}px`;
             tooltip.style.top = `${e.pageY + 10}px`;
-            tooltip.innerText = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+            tooltip.innerText = `Lat: ${currentLat.toFixed(6)}, Lon: ${currentLon.toFixed(6)}`;
             tooltip.style.display = 'block';
         });
 
@@ -220,6 +230,6 @@ crossorigin=""></script>
                 window.open(url, '_blank');
             }
         });
-    }
+    });
 </script>
 {% endblock %}

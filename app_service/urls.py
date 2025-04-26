@@ -16,12 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from rest_app.views.home_views import home, upload, inference, generate_pdf_report
+from rest_app.views.home_views import home, upload, inference
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", home, name="home"),
     path("upload/", upload, name="upload"),
     path("inference/", inference, name="inference"),
-    path('report/pdf/', generate_pdf_report, name='generate_pdf'),
+    # path('report/pdf/', generate_pdf_report, name='generate_pdf'),
+    # path('report/view/<header_id>', report_viewer, name='view_report'),
+    
 ]
