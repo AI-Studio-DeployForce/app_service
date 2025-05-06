@@ -65,7 +65,7 @@ def inference(request):
             flask_response = requests.post(
                 os.getenv('INFERENCE_API_URL', 'http://127.0.0.1:8001/predict'),
                 json={'images': cloudinary_payload},
-                timeout=9999
+                timeout=50
             )
             if flask_response.status_code != 200:
                 return JsonResponse({'status': 'error', 'message': 'Flask prediction failed'}, status=500)
