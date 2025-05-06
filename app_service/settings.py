@@ -16,7 +16,6 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
@@ -43,6 +42,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  #  ← add right after Security
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -111,10 +111,24 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
+# STATIC_URL = "static/"
+# STATIC_FILES_DIRS = {
+#     os.path.join(BASE_DIR, 'static'),
+# }
+
 STATIC_URL = "static/"
-STATIC_FILES_DIRS = {
-    os.path.join(BASE_DIR, 'static'),
-}
+
+# leave off STATICFILES_DIRS unless you really need it; Django will still pick up
+# <app>/static/ folders.  If you do want a project‑level folder, keep it but
+# make sure it exists (Dockerfile already creates /code/static).
+# STATICFILES_DIRS = [BASE_DIR / "static"]
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+# Use WhiteNoise’s compressed / hashed storage (recommended)
+STATICFILES_STORAGE = (
+    "whitenoise.storage.CompressedManifestStaticFilesStorage"
+)
 
 MEDIA_URL = "images/"
 
