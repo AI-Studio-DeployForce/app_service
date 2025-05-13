@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     'rest_app.apps.RestAppConfig',
+    'django.contrib.humanize'
 ]
 
 MIDDLEWARE = [
