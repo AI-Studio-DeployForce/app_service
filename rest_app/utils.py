@@ -7,6 +7,21 @@ from rest_app.config.cloudinary import upload_file
 import tempfile
 from datetime import datetime
 
+# --------------------------------------------------------------------------- #
+# CONSTANTS                                                                   #
+# --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 1.  Cost constants (USD per pixel) – tune as needed                         #
+# --------------------------------------------------------------------------- #
+COST_PER_PIXEL = {
+    "no_damage":      0,     # inspection only
+    "minor_damage":   0.12,  # ~ $120 / m² if 1 px ≈ 0.22 m²
+    "major_damage":   0.35,  # ~ $350 / m²
+    "destroyed":      0.75,  # ~ $750 / m²
+}
+SEVERITY_ORDER = ["no_damage", "minor_damage", "major_damage", "destroyed"]
+# --------------------------------------------------------------------------- #
+
 def transform_five_reference_coords(image_size, geo_transform):
     """
     Converts selected pixel coordinates (corners and center) to geographical coordinates.
@@ -104,45 +119,110 @@ def validate_json_structure(json_data, expected_image_names):
 
     return True
 
-def generate_pdf_report(header_id, detail_entries):
+def _image_breakdown(detail_row):
+    """Return per‑image breakdown list for the PDF."""
+    area_tot = sum(detail_row[f"area_{c}"] for c in SEVERITY_ORDER) or 1  # avoid ÷0
+    out = []
+    for cat in SEVERITY_ORDER:
+        area   = detail_row[f"area_{cat}"]
+        count  = detail_row[f"num_{cat}"]
+        pct    = 100 * area / area_tot
+        totcost = area * COST_PER_PIXEL[cat]
+        out.append({
+            "category": cat,
+            "count":    count,
+            "area":     area,
+            "percentage": pct,
+            "total_cost": totcost,
+        })
+    return out
+
+
+def generate_pdf_report(header_id,
+                        detail_entries,
+                        summary_stats,
+                        grand_area,
+                        grand_cost,
+                        total_clusters):
     """
-    Renders the report HTML to PDF, uploads it to Cloudinary, and returns the secure URL.
+    Renders the report HTML to PDF, uploads it to Cloudinary, and
+    returns (secure_url, None)  – or (None, error_msg) on failure.
     """
-    summary_counts = {
-        "Destroyed": sum(d["num_destroyed"] for d in detail_entries),
-        "Major Damage": sum(d["num_major_damage"] for d in detail_entries),
-        "Minor Damage": sum(d["num_minor_damage"] for d in detail_entries),
-        "No Damage": sum(d["num_no_damage"] for d in detail_entries),
-    }
-    total = sum(summary_counts.values())
-    summary_stats = [
-        {"category": k, "count": v, "percentage": f"{round((v / total) * 100) if total else 0}%"}
-        for k, v in summary_counts.items()
+    # ---------------------------------------------------------------
+    # Build per‑image section data
+    # ---------------------------------------------------------------
+    damage_keys = [
+        ("no_damage",     "No Damage"),
+        ("minor_damage",  "Minor Damage"),
+        ("major_damage",  "Major Damage"),
+        ("destroyed",     "Destroyed"),
     ]
 
     image_data = []
+
     for d in detail_entries:
-        # Replace with actual building-level inference in future
-        buildings = [
-            {"id": 1, "lat": 14.4143, "lon": -90.8230, "severity": "Destroyed"},
-            {"id": 2, "lat": 14.4145, "lon": -90.8231, "severity": "Major Damage"},
-        ]
+        # 1) reconstruct the breakdown list -----------------------------------
+        brk = []
+        for key, label in damage_keys:
+            count = d.get(f"num_{key}",   0)
+            area  = d.get(f"area_{key}",  0)
+            cost  = d.get(f"cost_{key}",  0)
+
+            # keep rows that have at least one non‑zero value
+            if any((count, area, cost)):
+                brk.append({
+                    "category":   label,
+                    "count":      count,
+                    "area":       area,
+                    "total_cost": cost,
+                })
+
+        # 2) per‑image totals --------------------------------------------------
+        tot_count = sum(b["count"]      for b in brk)
+        tot_area  = sum(b["area"]       for b in brk)
+        tot_cost  = sum(b["total_cost"] for b in brk)
+
+        # 3) add % share (safe for zero‑area images) ---------------------------
+        for b in brk:
+            b["percentage"] = (b["area"] / tot_area * 100) if tot_area else 0
+
+        # 4) assemble the structure used by the template ----------------------
         image_data.append({
             "post_image_url": d["post_image_url"],
             "mask_image_url": d["damage_mask_url"],
-            "buildings": buildings
+            "breakdown":      brk,
+            "totals": {
+                "count": tot_count,
+                "area":  tot_area,
+                "cost":  tot_cost,
+            },
         })
 
+    unit_costs = [
+        {"category": "No Damage",    "unit_cost": COST_PER_PIXEL["no_damage"]},
+        {"category": "Minor Damage", "unit_cost": COST_PER_PIXEL["minor_damage"]},
+        {"category": "Major Damage", "unit_cost": COST_PER_PIXEL["major_damage"]},
+        {"category": "Destroyed",    "unit_cost": COST_PER_PIXEL["destroyed"]},
+    ]
+    # ---------------------------------------------------------------
+    # Render HTML with Jinja2 template
+    # ---------------------------------------------------------------
     context = {
-        "summary_stats": summary_stats,
-        "total": total,
-        "image_data": image_data,
-        "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "summary_stats":   summary_stats,
+        "grand_area":      grand_area,
+        "grand_cost":      grand_cost,
+        "total_clusters":  total_clusters,
+        "image_data":      image_data,
+        "generation_date": datetime.utcnow().strftime("%Y‑%m‑%d %H:%M:%S"),
+        "unit_costs":       unit_costs,
     }
-    template = get_template("report.html")
-    html = template.render(context)
 
-    # Save PDF to a temp file
+    template = get_template("report.html")        # Django’s loader
+    html     = template.render(context)
+
+    # ---------------------------------------------------------------
+    # Create a temporary PDF
+    # ---------------------------------------------------------------
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pisa_status = pisa.CreatePDF(html, dest=tmp)
         pdf_path = tmp.name
@@ -150,14 +230,41 @@ def generate_pdf_report(header_id, detail_entries):
     if pisa_status.err:
         return None, "Failed to generate PDF"
 
-    # Upload PDF to Cloudinary
-    upload_result = upload_file(pdf_path, folder="reports", public_id=f"{header_id}_report")
+    # ---------------------------------------------------------------
+    # Upload to Cloudinary
+    # ---------------------------------------------------------------
+    upload_res = upload_file(pdf_path,
+                             folder="reports",
+                             public_id=f"{header_id}_report")
     os.remove(pdf_path)
 
-    if upload_result["success"]:
-        return upload_result["secure_url"], None
-    else:
-        return None, upload_result["error"]
+    if upload_res["success"]:
+        return upload_res["secure_url"], None
+    return None, upload_res["error"]
+
+def build_summary(detail_rows):
+    """Return summary_stats list + grand totals for the PDF."""
+    by_cat = {cat: {"count": 0, "area": 0, "unit_cost": COST_PER_PIXEL[cat]}   # UNIT_COST = same dict you use in Flask
+              for cat in SEVERITY_ORDER}
+
+    for row in detail_rows:
+        for cat in SEVERITY_ORDER:
+            by_cat[cat]["count"] += row[f"num_{cat}"]
+            by_cat[cat]["area"]  += row[f"area_{cat}"]
+
+    grand_area = sum(v["area"] for v in by_cat.values())
+    grand_cost = 0
+    summary    = []
+    for cat in SEVERITY_ORDER:
+        v = by_cat[cat]
+        v["percentage"]  = 0 if grand_area == 0 else 100 * v["area"] / grand_area
+        v["total_cost"]  = v["area"] * v["unit_cost"]
+        grand_cost      += v["total_cost"]
+        summary.append({"category": cat, **v})
+
+    total_clusters = sum(v["count"] for v in by_cat.values())
+    return summary, grand_area, grand_cost, total_clusters
+
 
 def render_to_pdf(template_src, context_dict={}):
     template = get_template(template_src)
